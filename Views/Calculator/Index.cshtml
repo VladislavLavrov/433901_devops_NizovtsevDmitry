@@ -1,0 +1,26 @@
+@model CalculatorInput
+@{
+    ViewData["Title"] = "Калькулятор";
+}
+<h1>Калькулятор</h1>
+<p>Введите два числа и выберите действие.</p>
+<form asp-controller="Calculator" asp-action="Calculate" method="post">
+    <input asp-for="Num1" type="number" step="any" placeholder="Первое число" aria-label="Первое число" required />
+    <select asp-for="Operation" aria-label="Действие">
+        <option value="Add">+</option>
+        <option value="Subtract">−</option>
+        <option value="Multiply">×</option>
+        <option value="Divide">÷</option>
+    </select>
+    <input asp-for="Num2" type="number" step="any" placeholder="Второе число" aria-label="Второе число" required />
+    <button type="submit">Вычислить</button>
+</form>
+<div asp-validation-summary="All" class="error"></div>
+@if (Model.Error is not null)
+{
+    <p class="error">@Model.Error</p>
+}
+@if (Model.Result.HasValue)
+{
+    <p class="result">Результат: <strong>@Model.Result.Value</strong></p>
+}
