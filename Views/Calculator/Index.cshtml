@@ -13,7 +13,7 @@
         <option value="Divide">÷</option>
     </select>
     <input asp-for="Num2" type="number" step="any" placeholder="Второе число" aria-label="Второе число" required />
-    <button type="submit">Вычислить!</button>
+    <button type="submit">Вычислить</button>
 </form>
 <div asp-validation-summary="All" class="error"></div>
 @if (Model.Error is not null)
