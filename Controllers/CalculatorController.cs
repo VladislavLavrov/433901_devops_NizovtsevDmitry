@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using Calculator.Data;
 using Calculator.Models;
 using Calculator.Services;
@@ -9,61 +11,34 @@ namespace Calculator.Controllers;
 
 public sealed class CalculatorController(
     CalculatorContext context,
-    KafkaProducerService producer,
-    ILogger<CalculatorController> logger) : Controller
+    KafkaProducerService<Null, string> producer,
+    IConfiguration configuration) : Controller
 {
-    [HttpGet]
-    public IActionResult Index() => View(new CalculatorInput());
+    public async Task<IActionResult> Index() => View(await context.DataInputVariants
+        .AsNoTracking().OrderByDescending(x => x.ID_DataInputVariant).ToListAsync());
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Calculate(CalculatorInput input, CancellationToken token)
+    public async Task<IActionResult> Calculate(double num1, double num2, Operation operation)
     {
-        if (!ModelState.IsValid) return View("Index", input);
-        input.Error = CalculatorLibrary.Validate(input.Num1!.Value, input.Num2!.Value, input.Operation);
-        if (input.Error is not null) return View("Index", input);
-        var request = new CalculationRequest
+        var data = new DataInputVariant
         {
-            RequestId = Guid.NewGuid(),
-            Operand1 = input.Num1.Value,
-            Operand2 = input.Num2.Value,
-            Operation = input.Operation,
-            SentAtUtc = DateTimeOffset.UtcNow
+            Operand_1 = num1.ToString("R", CultureInfo.InvariantCulture),
+            Operand_2 = num2.ToString("R", CultureInfo.InvariantCulture),
+            Type_operation = operation.ToString()
         };
-        try { await producer.SendRequestAsync(request, token); }
-        catch (KafkaException error)
-        {
-            logger.LogError(error, "Kafka delivery failed for {RequestId}", request.RequestId);
-            input.Error = "Не удалось подтвердить отправку в Kafka. Проверьте историю перед повторной отправкой.";
-            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            return View("Index", input);
-        }
-        // Calculation and persistence happen only in KafkaConsumerService.
-        return RedirectToAction(nameof(Result), new { id = request.RequestId });
+        await producer.ProduceAsync(configuration["Kafka:TopicName"]!,
+            new Message<Null, string> { Value = JsonSerializer.Serialize(data) });
+        return RedirectToAction(nameof(Index));
     }
 
-    [HttpGet]
-    public async Task<IActionResult> Result(Guid id, CancellationToken token)
+    [HttpPost]
+    public async Task<IActionResult> Callback([FromBody] DataInputVariant data)
     {
-        var key = id.ToString();
-        var row = await context.DataInputVariants.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.RequestId == key, token);
-        return View(new CalculationResultViewModel(id, row));
+        context.DataInputVariants.Add(data);
+        await context.SaveChangesAsync();
+        return Ok();
     }
 
-    [HttpGet]
-    public async Task<IActionResult> Status(Guid id, CancellationToken token)
-    {
-        var key = id.ToString();
-        var row = await context.DataInputVariants.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.RequestId == key, token);
-        return Json(new { requestId = key, completed = row is not null, result = row?.Result, databaseId = row?.ID_DataInputVariant });
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> History(CancellationToken token) => View(await context.DataInputVariants
-        .AsNoTracking().OrderByDescending(x => x.ID_DataInputVariant).Take(100).ToListAsync(token));
-
-    [HttpGet]
     public IActionResult Error() => View();
 }

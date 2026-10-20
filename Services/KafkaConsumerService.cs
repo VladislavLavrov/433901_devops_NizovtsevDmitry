@@ -1,127 +1,69 @@
 using System.Globalization;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Calculator.Data;
 using Calculator.Models;
 using Confluent.Kafka;
-using Microsoft.EntityFrameworkCore;
 
 namespace Calculator.Services;
 
-public sealed class KafkaConsumerService(
-    IServiceScopeFactory scopes,
-    KafkaOptions options,
-    KafkaProducerService producer,
-    ILogger<KafkaConsumerService> logger) : BackgroundService
+public sealed class KafkaConsumerService : BackgroundService
 {
-    // Consume blocks a thread, so run it outside the web server startup thread.
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
-        Task.Run(() => ConsumeLoopAsync(stoppingToken), stoppingToken);
+    private readonly IConfiguration configuration;
+    private readonly IHttpClientFactory clientFactory;
+    private readonly ILogger<KafkaConsumerService> logger;
 
-    private async Task ConsumeLoopAsync(CancellationToken token)
+    public KafkaConsumerService(IConfiguration configuration, IHttpClientFactory clientFactory,
+        ILogger<KafkaConsumerService> logger)
     {
-        using var consumer = new ConsumerBuilder<string, string>(new ConsumerConfig
-        {
-            BootstrapServers = options.BootstrapServers,
-            GroupId = options.GroupId,
-            ClientId = "nizovtsev13-calculator-consumer",
-            AutoOffsetReset = AutoOffsetReset.Earliest,
-            EnableAutoCommit = false,
-            EnableAutoOffsetStore = false,
-            MaxPollIntervalMs = 300000
-        }).Build();
-        consumer.Subscribe(options.RequestTopic);
-        logger.LogInformation("Consumer started: topic={Topic}, group={Group}", options.RequestTopic, options.GroupId);
+        this.configuration = configuration;
+        this.clientFactory = clientFactory;
+        this.logger = logger;
+    }
+
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
+        Task.Run(() => ConsumeLoop(stoppingToken), stoppingToken);
+
+    private async Task ConsumeLoop(CancellationToken token)
+    {
+        var settings = new ConsumerConfig();
+        configuration.GetSection("Kafka:ConsumerSettings").Bind(settings);
+        using var consumer = new ConsumerBuilder<Null, string>(settings).Build();
+        consumer.Subscribe(configuration["Kafka:TopicName"]!);
         try
         {
             while (!token.IsCancellationRequested)
             {
-                var message = consumer.Consume(token);
-                // Retry the SAME message, rather than reading and skipping to the next one.
-                while (!token.IsCancellationRequested)
+                try
                 {
-                    try
-                    {
-                        await ProcessAsync(message, token);
-                        break;
-                    }
-                    catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-                    catch (Exception error)
-                    {
-                        logger.LogError(error, "Processing failed at {Offset}; retrying in 2 seconds", message.TopicPartitionOffset);
-                        await Task.Delay(TimeSpan.FromSeconds(2), token);
-                    }
+                    var message = consumer.Consume(token);
+                    var data = JsonSerializer.Deserialize<DataInputVariant>(message.Message.Value)
+                        ?? throw new JsonException("Empty calculation message.");
+                    var result = CalculatorLibrary.CalculateOperation(
+                        double.Parse(data.Operand_1!, CultureInfo.InvariantCulture),
+                        double.Parse(data.Operand_2!, CultureInfo.InvariantCulture),
+                        Enum.Parse<Operation>(data.Type_operation!));
+                    data.Result = result.ToString("R", CultureInfo.InvariantCulture);
+                    using var client = clientFactory.CreateClient();
+                    using var response = await client.PostAsJsonAsync(
+                        "http://localhost:5055/Calculator/Callback", data, token);
+                    response.EnsureSuccessStatusCode();
+                    logger.LogInformation("Message key: {Key}, value: {Value}",
+                        message.Message.Key, message.Message.Value);
                 }
-                token.ThrowIfCancellationRequested();
-                // Commit only AFTER the DB write and result publication succeed.
-                // A rebalance/commit failure stops this service; the uncommitted request is replayed on restart.
-                consumer.Commit(message);
-                logger.LogInformation("Committed {Offset}", message.TopicPartitionOffset);
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
+                catch (ConsumeException error)
+                {
+                    logger.LogError(error, "Kafka consume error");
+                    if (error.Error.IsFatal) break;
+                }
+                catch (Exception error)
+                {
+                    logger.LogError(error, "Calculation/Callback failed");
+                    break;
+                }
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         finally { consumer.Close(); }
-    }
-
-    private async Task ProcessAsync(ConsumeResult<string, string> message, CancellationToken token)
-    {
-        CalculationRequest request;
-        try
-        {
-            request = JsonSerializer.Deserialize<CalculationRequest>(message.Message.Value, KafkaJson.Options)
-                ?? throw new JsonException("Empty calculation request.");
-            if (request.RequestId == Guid.Empty) throw new ArgumentException("RequestId is required.");
-            var error = CalculatorLibrary.Validate(request.Operand1, request.Operand2, request.Operation);
-            if (error is not null) throw new ArgumentException(error);
-        }
-        catch (Exception error) when (error is JsonException or ArgumentException)
-        {
-            // Malformed external messages go to a separate topic instead of blocking the queue forever.
-            await producer.SendJsonAsync(options.ErrorTopic, message.Message.Key ?? "invalid", new
-            {
-                SourceTopic = message.Topic,
-                Partition = message.Partition.Value,
-                Offset = message.Offset.Value,
-                RawValue = message.Message.Value,
-                Error = error.Message
-            }, token);
-            logger.LogWarning("Rejected malformed request at {Offset}: {Error}", message.TopicPartitionOffset, error.Message);
-            return;
-        }
-
-        var key = request.RequestId.ToString();
-        await using var scope = scopes.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<CalculatorContext>();
-        var row = await context.DataInputVariants.SingleOrDefaultAsync(x => x.RequestId == key, token);
-        if (row is null)
-        {
-            string value;
-            try
-            {
-                value = CalculatorLibrary.CalculateOperation(request.Operand1, request.Operand2, request.Operation)
-                    .ToString("R", CultureInfo.InvariantCulture);
-            }
-            catch (ArithmeticException error) { value = "Ошибка: " + error.Message; }
-            row = new DataInputVariant
-            {
-                RequestId = key,
-                Operand_1 = request.Operand1.ToString("R", CultureInfo.InvariantCulture),
-                Operand_2 = request.Operand2.ToString("R", CultureInfo.InvariantCulture),
-                Type_operation = request.Operation.ToString(),
-                Result = value
-            };
-            context.DataInputVariants.Add(row);
-            await context.SaveChangesAsync(token);
-        }
-        await producer.SendJsonAsync(options.ResultTopic, key, new
-        {
-            RequestId = key,
-            DatabaseId = row.ID_DataInputVariant,
-            row.Operand_1,
-            row.Operand_2,
-            row.Type_operation,
-            row.Result
-        }, token);
-        logger.LogInformation("Processed request={RequestId}, result={Result}, DB id={Id}",
-            key, row.Result, row.ID_DataInputVariant);
     }
 }
