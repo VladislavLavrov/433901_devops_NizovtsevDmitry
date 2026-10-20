@@ -1,0 +1,22 @@
+@model CalculationResultViewModel
+@{ ViewData["Title"] = "Результат через Kafka"; }
+@section Head {
+    @if (Model.Record is null)
+    {
+        <meta http-equiv="refresh" content="2" />
+    }
+}
+<h1>Результат через Kafka</h1>
+<p>GUID запроса: <code>@Model.RequestId</code></p>
+@if (Model.Record is null)
+{
+    <p>Запрос отправлен в Kafka. Ожидаем обработку и запись в MariaDB.</p>
+    <p>Страница обновляется каждые 2 секунды. Если ожидание долгое, проверьте журнал web и Kafka.</p>
+}
+else
+{
+    <p>@Model.Record.Operand_1 · @Model.Record.Type_operation · @Model.Record.Operand_2</p>
+    <p class="result">Результат: <strong>@Model.Record.Result</strong></p>
+    <p>Запись MariaDB № @Model.Record.ID_DataInputVariant</p>
+}
+<p><a asp-action="Index">Новый расчёт</a> · <a asp-action="History">История расчётов</a></p>
