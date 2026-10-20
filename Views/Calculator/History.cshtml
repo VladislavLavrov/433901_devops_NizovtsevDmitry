@@ -1,13 +1,13 @@
 @model IReadOnlyList<Calculator.Data.DataInputVariant>
 @{ ViewData["Title"] = "История расчётов"; }
 <h1>История расчётов</h1>
-<p>Последние 100 успешных вычислений из MariaDB.</p>
+<p>Последние 100 обработанных запросов из MariaDB.</p>
 <table>
-    <thead><tr><th>ID</th><th>Первое число</th><th>Второе число</th><th>Операция</th><th>Результат</th></tr></thead>
+    <thead><tr><th>ID</th><th>GUID запроса</th><th>Первое число</th><th>Второе число</th><th>Операция</th><th>Результат</th></tr></thead>
     <tbody>
     @foreach (var item in Model)
     {
-        <tr><td>@item.ID_DataInputVariant</td><td>@item.Operand_1</td><td>@item.Operand_2</td><td>@item.Type_operation</td><td>@item.Result</td></tr>
+        <tr><td>@item.ID_DataInputVariant</td><td style="font-size:.8rem;overflow-wrap:anywhere">@item.RequestId</td><td>@item.Operand_1</td><td>@item.Operand_2</td><td>@item.Type_operation</td><td>@item.Result</td></tr>
     }
     </tbody>
 </table>
