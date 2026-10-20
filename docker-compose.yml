@@ -1,4 +1,3 @@
-# Keep the PR2 project name: this upgrades web and reuses the existing database volume.
 name: nizovtsev13-pr2
 services:
   mariadb:
@@ -6,10 +5,10 @@ services:
     container_name: nizovtsev13-pr2-db
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Keep the original DB_ROOT_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
       MARIADB_DATABASE: 13-WebCalculatorDb
       MARIADB_USER: calculator13
-      MARIADB_PASSWORD: ${DB_PASSWORD:?Keep the original DB_PASSWORD in .env}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
     ports:
       - "${DB_PORT:-5043}:3306"
     volumes:
@@ -20,70 +19,6 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
-
-  kafka:
-    image: apache/kafka:3.9.1
-    container_name: nizovtsev13-kafka
-    restart: unless-stopped
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:19092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:${KAFKA_LOCAL_PORT:-19013}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_LOG_RETENTION_HOURS: 168
-      KAFKA_LOG_SEGMENT_BYTES: 104857600
-      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
-      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
-    ports:
-      - "127.0.0.1:${KAFKA_LOCAL_PORT:-19013}:19092"
-    volumes:
-      - kafka-data:/var/lib/kafka/data
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1"]
-      interval: 10s
-      timeout: 10s
-      retries: 18
-      start_period: 40s
-
-  kafka-init:
-    image: apache/kafka:3.9.1
-    container_name: nizovtsev13-kafka-init
-    depends_on:
-      kafka:
-        condition: service_healthy
-    restart: "no"
-    entrypoint: ["/bin/bash", "-ec"]
-    command:
-      - |
-        for topic in nizovtsev13-calculation-requests nizovtsev13-calculation-results nizovtsev13-calculation-errors; do
-          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic "$$topic" --partitions 1 --replication-factor 1
-        done
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:v0.7.2
-    container_name: nizovtsev13-kafka-ui
-    restart: unless-stopped
-    environment:
-      KAFKA_CLUSTERS_0_NAME: nizovtsev13
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_READONLY: "true"
-      JAVA_OPTS: -Xms128m -Xmx256m
-    ports:
-      - "${KAFKA_UI_PORT:-10113}:8080"
-    depends_on:
-      kafka:
-        condition: service_healthy
-
   web:
     image: 13-calculator-kafka:latest
     build:
@@ -93,17 +28,14 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Server=mariadb;Port=3306;Database=13-WebCalculatorDb;User=calculator13;Password=${DB_PASSWORD:?Keep the original DB_PASSWORD in .env};"
+      ConnectionStrings__DefaultConnection: "Server=mariadb;Port=3306;Database=13-WebCalculatorDb;User=calculator13;Password=${DB_PASSWORD:?Set DB_PASSWORD in .env};"
       Database__MigrateOnStartup: "true"
-      Kafka__BootstrapServers: kafka:9092
+      Kafka__ProducerSettings__BootstrapServers: 93.88.178.186:9094
+      Kafka__ConsumerSettings__BootstrapServers: 93.88.178.186:9094
     ports:
       - "${WEB_PORT:-5313}:5055"
     depends_on:
       mariadb:
         condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-
 volumes:
   mariadb-data:
-  kafka-data:

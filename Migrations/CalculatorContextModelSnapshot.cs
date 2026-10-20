@@ -36,12 +36,7 @@ public partial class CalculatorContextModelSnapshot : ModelSnapshot
                 .HasMaxLength(128)
                 .HasColumnType("varchar(128)")
                 .HasAnnotation("MySql:CharSet", "utf8mb4");
-            entity.Property<string>("RequestId")
-                .HasMaxLength(36)
-                .HasColumnType("varchar(36)")
-                .HasAnnotation("MySql:CharSet", "utf8mb4");
             entity.HasKey("ID_DataInputVariant");
-            entity.HasIndex("RequestId").IsUnique();
             entity.ToTable("DataInputVariants");
         });
     }
