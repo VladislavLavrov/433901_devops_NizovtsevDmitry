@@ -3,5 +3,6 @@ services:
     container_name: web-app-calculator-jenkins-nizovtsev13
     hostname: app
     build: Calculator/
+    network_mode: bridge
     ports:
       - "0.0.0.0:5213:5013"
