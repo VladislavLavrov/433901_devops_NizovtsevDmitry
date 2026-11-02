@@ -1,0 +1,24 @@
+@{
+    ViewData["Title"] = "Простой калькулятор";
+}
+<h2>@ViewData["Title"]</h2>
+<form method="post" asp-controller="Calculator" asp-action="Index">
+    @Html.AntiForgeryToken()
+    <input type="number" step="any" name="num1" aria-label="Первое число" required />
+    <select name="operation" aria-label="Операция" required>
+        <option value="Add">+</option>
+        <option value="Subtract">-</option>
+        <option value="Multiply">*</option>
+        <option value="Divide">/</option>
+    </select>
+    <input type="number" step="any" name="num2" aria-label="Второе число" required />
+    <input type="submit" value="Рассчитать" />
+</form>
+@if (!string.IsNullOrEmpty((string?)ViewBag.Result))
+{
+    <p>Результат операции: @ViewBag.Result</p>
+}
+@if (!string.IsNullOrEmpty((string?)ViewBag.Error))
+{
+    <p>@ViewBag.Error</p>
+}
