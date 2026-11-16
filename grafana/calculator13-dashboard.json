@@ -177,8 +177,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (error_type) (increase(http_server_request_duration_seconds_count{instance=\"93.88.178.186:50
-          13\",http_response_status_code=\"500\"}[10m]))",
+          "expr": "sum by (error_type) (increase(http_server_request_duration_seconds_count{instance=\"93.88.178.186:5013\",http_response_status_code=\"500\"}[10m]))",
           "legendFormat": "{{error_type}}",
           "range": true,
           "instant": false,
