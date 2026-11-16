@@ -1,0 +1,14 @@
+Панели из п. 3.7 пособия. Запросы дополнены фильтром собственного instance.
+
+Среднее время выполнения
+avg_over_time(http_server_request_duration_seconds_sum{instance="93.88.178.186:5413",aspnetcore_request_is_unhandled!="true",http_route!="/healthz",http_route!="/metrics",http_route!=""}[1h]) / avg_over_time(http_server_request_duration_seconds_count{instance="93.88.178.186:5413",aspnetcore_request_is_unhandled!="true",http_route!="/healthz",http_route!="/metrics",http_route!=""}[1h])
+Единица: s
+
+Количество запросов
+sum by (http_route) (rate(http_server_request_duration_seconds_count{instance="93.88.178.186:5413",aspnetcore_request_is_unhandled!="true",http_route!="/healthz",http_route!="/metrics",http_route!=""}[1h]) * 3600)
+Единица: short
+
+Ошибки
+sum by (error_type) (increase(http_server_request_duration_seconds_count{instance="93.88.178.186:5413",http_response_status_code="500"}[10m]))
+Единица: short
+

@@ -1,7 +1,11 @@
+name: nizovtsev13-monitoring
+
 services:
   web:
-    container_name: web-app-calculator-jenkins-nizovtsev13
-    hostname: app
+    image: 13-calculator-monitoring:latest
+    container_name: nizovtsev13-monitoring-web
     build: Calculator/
+    network_mode: bridge
+    restart: unless-stopped
     ports:
-      - "0.0.0.0:5213:5013"
+      - "0.0.0.0:5413:5013"

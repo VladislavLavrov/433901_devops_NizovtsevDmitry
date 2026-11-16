@@ -35,6 +35,8 @@ public sealed class CalculatorController : Controller
         }
         catch (DivideByZeroException exception)
         {
+            // Учебная проверка панели HTTP 500 в Grafana.
+            Response.StatusCode = StatusCodes.Status500InternalServerError;
             ViewBag.Error = exception.Message;
         }
         return View();
