@@ -1,0 +1,8 @@
+# ФРАГМЕНТ: добавить этот элемент в scrape_configs общего Prometheus.
+# Не заменять этим файлом общий prometheus.yml.
+- job_name: web-metrics-nizovtsev13
+  metrics_path: /metrics
+  scrape_interval: 10s
+  static_configs:
+    - targets:
+        - 93.88.178.186:5413
