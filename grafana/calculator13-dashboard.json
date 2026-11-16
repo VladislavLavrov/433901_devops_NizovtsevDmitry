@@ -71,7 +71,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "avg_over_time(http_server_request_duration_seconds_sum{instance=\"93.88.178.186:5413\",aspnetcore_request_is_unhandled!=\"true\",http_route!=\"/healthz\",http_route!=\"/metrics\",http_route!=\"\"}[1h]) / avg_over_time(http_server_request_duration_seconds_count{instance=\"93.88.178.186:5413\",aspnetcore_request_is_unhandled!=\"true\",http_route!=\"/healthz\",http_route!=\"/metrics\",http_route!=\"\"}[1h])",
+          "expr": "avg_over_time(http_server_request_duration_seconds_sum{instance=\"93.88.178.186:5013\",aspnetcore_request_is_unhandled!=\"true\",http_route!=\"/healthz\",http_route!=\"/metrics\",http_route!=\"\"}[1h]) / avg_over_time(http_server_request_duration_seconds_count{instance=\"93.88.178.186:5013\",aspnetcore_request_is_unhandled!=\"true\",http_route!=\"/healthz\",http_route!=\"/metrics\",http_route!=\"\"}[1h])",
           "legendFormat": "{{http_route}}",
           "range": true,
           "instant": false,
@@ -124,7 +124,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{instance=\"93.88.178.186:5413\",aspnetcore_request_is_unhandled!=\"true\",http_route!=\"/healthz\",http_route!=\"/metrics\",http_route!=\"\"}[1h]) * 3600)",
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{instance=\"93.88.178.186:5013\",aspnetcore_request_is_unhandled!=\"true\",http_route!=\"/healthz\",http_route!=\"/metrics\",http_route!=\"\"}[1h]) * 3600)",
           "legendFormat": "{{http_route}}",
           "range": true,
           "instant": false,
@@ -177,7 +177,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (error_type) (increase(http_server_request_duration_seconds_count{instance=\"93.88.178.186:5413\",http_response_status_code=\"500\"}[10m]))",
+          "expr": "sum by (error_type) (increase(http_server_request_duration_seconds_count{instance=\"93.88.178.186:50
+          13\",http_response_status_code=\"500\"}[10m]))",
           "legendFormat": "{{error_type}}",
           "range": true,
           "instant": false,
